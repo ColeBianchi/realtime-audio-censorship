@@ -1,4 +1,4 @@
 venv
-libs/__pycache_
+libs/__pycache__
 test_wavs
 .git
