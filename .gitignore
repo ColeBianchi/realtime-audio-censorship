@@ -1,0 +1,4 @@
+venv
+libs/__pycache_
+test_wavs
+.git
