@@ -90,4 +90,4 @@ def load_model(models, scorer):
 
     return [ds, model_load_end, scorer_load_end]
 
-run_model_on_file("./test_wavs/gridspace-stanford-harper-valley/data/audio/agent/de6e39536c314488_16k.wav")
+run_model_on_file("your_wav_file.wav")
