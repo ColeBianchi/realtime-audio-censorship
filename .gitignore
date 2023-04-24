@@ -4,3 +4,4 @@ test_wavs
 .git
 recordings
 __pycache__
+.vscode
