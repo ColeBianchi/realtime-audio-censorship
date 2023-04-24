@@ -9,21 +9,22 @@ Biggest Bird Labs, LLC
 
 Setup python virtual environment using Python 3.9
 
-### Docker
-Install is made easy for all systems using Docker:
-
-First build the image using
-
-`sudo docker build -t biggestbirdlabs/real-time-speech-censorship:{VERSION} .`
-
-Next run the image using
-
-`sudo docker run biggestbirdlabs/real-time-speech-censorship:{VERSION}`
-
 ### Linux (Fedora)
-Install Python 3.9, sox, and portaudio (This is required) using:
+This guide is specific to Fedora but should be adaptable to any system.
 
-`sudo dnf install python3.9 sox libportaudio2 libportaudiocpp0 portaudio19-dev`
+Install required dependencies using:
+
+```
+dnf -y update && \
+    dnf -y install python3.9 && \
+    dnf -y install python3-pip && \
+    dnf -y install sox && \
+    dnf -y install pulseaudio && \
+	dnf -y install alsa-lib alsa-utils && \
+	dnf -y install portaudio portaudio-devel && \
+	dnf -y install python3-pyaudio && \
+    dnf -y install gcc
+```
 
 Navigate to your workspace folder and setup the virtual environment:
 
