@@ -5,3 +5,4 @@ test_wavs
 recordings
 __pycache__
 .vscode
+models

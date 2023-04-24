@@ -3,3 +3,4 @@ webrtcvad
 numpy
 sounddevice
 scipy
+openai-whisper
