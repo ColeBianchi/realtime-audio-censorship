@@ -123,3 +123,5 @@ As far as testing is concerned, some things we may need to do include:
 - Acquiring many sources of audio data of various people speaking
 - Potentially creating various classifications of voices to make training “simpler”
 - Figuring a workaround for when some audio inputs may not be “clear”
+
+## Citations
