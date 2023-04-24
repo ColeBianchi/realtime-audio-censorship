@@ -36,3 +36,7 @@ Source the environment:
 Install pip requirements:
 
 `pip install -r requirements.txt`
+
+Run the code:
+
+`python censor.py`

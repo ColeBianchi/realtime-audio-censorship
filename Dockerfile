@@ -18,4 +18,4 @@ RUN virtualenv --python="/usr/bin/python3.9" venv
 #Add pip installs
 RUN source venv/bin/activate && pip install -r requirements.txt
 
-CMD ["venv/bin/python3.9", "example.py"]
+CMD ["venv/bin/python3.9", "censor.py"]
