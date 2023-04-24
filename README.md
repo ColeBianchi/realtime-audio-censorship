@@ -21,9 +21,9 @@ Next run the image using
 `sudo docker run biggestbirdlabs/real-time-speech-censorship:{VERSION}`
 
 ### Linux (Fedora)
-Install Python 3.9 and sox (This is required) using:
+Install Python 3.9, sox, and portaudio (This is required) using:
 
-`sudo dnf install python3.9 sox`
+`sudo dnf install python3.9 sox libportaudio2 libportaudiocpp0 portaudio19-dev`
 
 Navigate to your workspace folder and setup the virtual environment:
 

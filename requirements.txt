@@ -1,3 +1,5 @@
 deepspeech
 webrtcvad
 numpy
+soundevice
+scipy

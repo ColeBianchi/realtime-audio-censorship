@@ -8,39 +8,8 @@ import numpy as np
 from deepspeech import Model, version
 from libs import wavsplit
 
-def run_model_live():
-	model_path = os.path.expanduser("./models")
-	o_graph, scorer = resolve_models(model_path)
-	model = load_model(o_graph, scorer)
-
-	model_stream = model[0].createStream()
-	recording_process = subprocess.Popen(shlex.split('rec -q -V0 -e signed -L -c 1 -b 16 -r 16k -t raw - gain -2'), stdout=subprocess.PIPE, bufsize=0)
-
-	try:
-		rolling_count = 0
-		print("Recording has start, you can now start talking:")
-		while True:
-			data = recording_process.stdout.read(512)
-			model_stream.feedAudioContent(np.frombuffer(data, np.int16))
-
-			rolling_count += 1
-
-			if rolling_count == 75:
-				print('Transcription: ', model_stream.finishStream())
-				model_stream = model[0].createStream()
-				rolling_count = 0
-
-
-	except KeyboardInterrupt:
-		recording_process.terminate()
-		recording_process.wait()
-
-def run_model_on_file(wav_path):
-	model_path = os.path.expanduser("./models")
-	o_graph, scorer = resolve_models(model_path)
-	model = load_model(o_graph, scorer)
-
-	segments, sample_rate, audio_length = segment_generator(wav_path)
+def run_model_on_pcm(audio, sample_rate, audio_length, model):
+	segments, sample_rate, audio_length = segment_generator(audio, sample_rate, audio_length)
 
 	inference_time = 0
 	transcript = ""
@@ -58,8 +27,7 @@ def run_model_on_file(wav_path):
 	print(f"Transcript:\n{transcript}")
 
 
-def segment_generator(wavFile):
-    audio, sample_rate, audio_length = wavsplit.read_wave(wavFile)
+def segment_generator(audio, sample_rate, audio_length):
     assert sample_rate == 16000, f"Only 16000Hz input WAV files are supported!, Input file is {sample_rate}Hz"
     vad = webrtcvad.Vad(0) #Change this value (0-3) to be the amount to filter out non speech
     frames = wavsplit.frame_generator(30, audio, sample_rate)
@@ -89,5 +57,3 @@ def load_model(models, scorer):
     print(f"Loaded external scorer in {scorer_load_end}s.")
 
     return [ds, model_load_end, scorer_load_end]
-
-run_model_on_file("test_recording.wav")
