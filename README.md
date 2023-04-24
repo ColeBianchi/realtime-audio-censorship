@@ -7,7 +7,7 @@ Biggest Bird Labs, LLC
 
 ## Setup
 
-Setup python virtual environment using Python 3.9
+Setup python virtual environment using Python
 
 ### Linux (Fedora)
 This guide is specific to Fedora but should be adaptable to any system.
