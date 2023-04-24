@@ -16,7 +16,7 @@ Install required dependencies using:
 
 ```
 dnf -y update && \
-    dnf -y install python3.9 && \
+    dnf -y install python3 && \
     dnf -y install python3-pip && \
     dnf -y install sox && \
     dnf -y install pulseaudio && \
@@ -28,7 +28,7 @@ dnf -y update && \
 
 Navigate to your workspace folder and setup the virtual environment:
 
-`virtualenv --python="/usr/bin/python3.9" venv`
+`virtualenv --python="/usr/bin/python" venv`
 
 Source the environment:
 
