@@ -2,3 +2,5 @@ venv
 libs/__pycache__
 test_wavs
 .git
+recordings
+__pycache__

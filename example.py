@@ -90,4 +90,4 @@ def load_model(models, scorer):
 
     return [ds, model_load_end, scorer_load_end]
 
-run_model_on_file("test_recording.wav")
+run_model_on_file("recordings/test.wav")

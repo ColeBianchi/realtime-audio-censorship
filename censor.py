@@ -1,58 +1,72 @@
-import sounddevice as sd
-from scipy.io.wavfile import write
 import os
 import queue
 import threading
 import transcriber
 import time
-
-fs = 16000  # Sample rate (16kHz)
-seconds = 5  # Duration of recording (5 sec)
-file_count = 0
-save_recordings = True
+import recorder
 
 recording_queue = queue.Queue()
 playback_queue = queue.Queue()
 
-def record_audio():
-	try:
-		while True:
-			audio = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
-			sd.wait()  # Wait until recording is finished
+# def record_audio():
+# 	file_count = 0
+# 	fs = 16000  # Sample rate (16kHz)
+# 	seconds = 2  # Duration of recording (5 sec)
+# 	save_recordings = False
 
-			if save_recordings:
-				if not os.path.exists('recordings'):
-					os.makedirs('recordings')
-				write('recordings/output.wav', fs, myrecording)
+# 	while True:
+# 		audio = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
+# 		sd.wait()  # Wait until recording is finished
 
-			recording_queue.put(audio)
-	except KeyboardInterrupt:
-		print('Exiting recording thread')
+# 		if save_recordings:
+# 			if not os.path.exists('recordings'):
+# 				os.makedirs('recordings')
+# 			write(f'recordings/file_{file_count}.wav', fs, audio)
+
+# 		recording_queue.put(audio)
+# 		file_count += 1
+
+# 		print(audio)
+
+def record_audio():	
+	while True:
+		start = time.time()
+
+		# Record 5 seconds of audio
+		rec = recorder.AudioRecorder(duration=5)
+		recording_thread = threading.Thread(target=rec.run)
+		recording_thread.daemon = True
+		recording_thread.start()
+
+		time.sleep(5)
+
+		frames = rec.get_frames()
+
+		recording_queue.put(frames)
+		print(frames)
+		rec.save('test')
+		print(f'Obtained audio segment in {time.time() - start} seconds')
 
 def process_audio():
-	try:
-		model_path = os.path.expanduser("./models")
-		o_graph, scorer = transcriber.resolve_models(model_path)
-		model = transcriber.load_model(o_graph, scorer)
+	model_path = os.path.expanduser("./models")
+	o_graph, scorer = transcriber.resolve_models(model_path)
+	model = transcriber.load_model(o_graph, scorer)
 
-		while True:
-			if recording_queue.not_empty():
-				audio = recording_queue.get()
-				transcriber.run_model_on_pcm(audio, 16000, 5, model)
-			else:
-				time.sleep(0.1) #sleep for 100ms if no audio found
-	except KeyboardInterrupt:
-		print('Exiting transcription thread')
+	while True:
+		if not recording_queue.empty():
+			audio = recording_queue.get()
+			transcriber.run_model_on_pcm(audio, 16000, 5, model)
+		else:
+			time.sleep(0.1) #sleep for 100ms if no audio found
 
-#Start Threads
-recording_thread = threading.Thread(target=record_audio)
+#Start processing thread
 processing_thread = threading.Thread(target=process_audio)
-
-recording_thread.daemon = True
 processing_thread.daemon = True
-
-recording_thread.start()
 processing_thread.start()
+
+#Start recording thread
+record_audio()
+
 
 #Wait for threads to exit
 recording_queue.join()
