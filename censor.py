@@ -1,41 +1,43 @@
 import os
 import queue
 import threading
-import transcriber
 import time
 import recorder
 
+from whisper_transcribe import Transcriber
+
 recording_queue = queue.Queue()
 playback_queue = queue.Queue()
+
+recording_time = 4
+rate = 16000
 
 def record_audio():	
 	while True:
 		start = time.time()
 
 		# Record 5 seconds of audio
-		rec = recorder.AudioRecorder(duration=5)
+		rec = recorder.AudioRecorder(duration=recording_time)
+		rec.set_rate(rate)
 		recording_thread = threading.Thread(target=rec.run)
 		recording_thread.daemon = True
 		recording_thread.start()
 
-		time.sleep(5)
+		time.sleep(recording_time)
 
 		frames = rec.get_frames()
 
 		recording_queue.put(frames)
-		print(frames)
 		rec.save('test')
 		print(f'Obtained audio segment in {time.time() - start} seconds')
 
 def process_audio():
-	model_path = os.path.expanduser("./models")
-	o_graph, scorer = transcriber.resolve_models(model_path)
-	model = transcriber.load_model(o_graph, scorer)
+	t = Transcriber()
 
 	while True:
 		if not recording_queue.empty():
 			audio = recording_queue.get()
-			transcriber.run_model_on_pcm(audio, 16000, 5, model)
+			t.run_model_on_pcm(audio, rate, recording_time)
 		else:
 			time.sleep(0.1) #sleep for 100ms if no audio found
 
