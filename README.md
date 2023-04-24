@@ -15,15 +15,15 @@ This guide is specific to Fedora but should be adaptable to any system.
 Install required dependencies using:
 
 ```
-dnf -y update && \
-    dnf -y install python3 && \
-    dnf -y install python3-pip && \
-    dnf -y install sox && \
-    dnf -y install pulseaudio && \
+	dnf -y update && \
+	dnf -y install python3 && \
+	dnf -y install python3-pip && \
+	dnf -y install sox && \
+	dnf -y install pulseaudio && \
 	dnf -y install alsa-lib alsa-utils && \
 	dnf -y install portaudio portaudio-devel && \
 	dnf -y install python3-pyaudio && \
-    dnf -y install gcc
+	dnf -y install gcc
 ```
 
 Navigate to your workspace folder and setup the virtual environment:
