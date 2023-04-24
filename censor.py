@@ -8,26 +8,6 @@ import recorder
 recording_queue = queue.Queue()
 playback_queue = queue.Queue()
 
-# def record_audio():
-# 	file_count = 0
-# 	fs = 16000  # Sample rate (16kHz)
-# 	seconds = 2  # Duration of recording (5 sec)
-# 	save_recordings = False
-
-# 	while True:
-# 		audio = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
-# 		sd.wait()  # Wait until recording is finished
-
-# 		if save_recordings:
-# 			if not os.path.exists('recordings'):
-# 				os.makedirs('recordings')
-# 			write(f'recordings/file_{file_count}.wav', fs, audio)
-
-# 		recording_queue.put(audio)
-# 		file_count += 1
-
-# 		print(audio)
-
 def record_audio():	
 	while True:
 		start = time.time()

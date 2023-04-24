@@ -11,13 +11,6 @@ class AudioRecorder(threading.Thread):
         self.frames = None
 
     def run(self):
-        # def callback(indata, frames, time, status):
-        #     if status:
-        #         print(status)
-        #     self.frames.append(indata.copy())
-
-        # with sd.InputStream(callback=callback, channels=1, samplerate=16000):
-        #     sd.sleep(int(self.duration * 1000))
         channels = 1
         sample_rate = 16000
         self.frames = sd.rec(int(self.duration * sample_rate), samplerate=sample_rate, channels=channels)
