@@ -4,9 +4,9 @@ FROM fedora:latest
 RUN dnf -y update && \
     dnf -y install python3.9 && \
     dnf -y install python3-pip && \
-	dnf -y install sox && \
-	dnf -y install portaudio portaudio-devel python3-pyaudio
-
+    dnf -y install sox && \
+    dnf -y install portaudio portaudio-devel python3-pyaudio && \
+    dnf -y install gcc
 #Setup workdir
 WORKDIR /app
 COPY . /app

@@ -1,5 +1,5 @@
 deepspeech
 webrtcvad
 numpy
-soundevice
+sounddevice
 scipy
