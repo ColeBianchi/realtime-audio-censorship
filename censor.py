@@ -2,6 +2,8 @@ import queue
 import threading
 import time
 import recorder
+import os
+import string
 
 from whisper_transcribe import Transcriber
 
@@ -11,6 +13,7 @@ playback_queue = queue.Queue()
 recording_time = 4
 rate = 16000
 save_frames = False
+banning_probability = 0.5
 
 def record_audio():
 	'''
@@ -80,22 +83,46 @@ def playback_audio():
 	Returns:
 		None
 	'''
+	# Load banned words list to scan later
+	banned_words = []
+	with open('banned_words.txt', 'r') as f:
+		for line in f:
+			banned_words.append(line.strip())
+		f.close()
+
+	# Translator used to clean detected words for list queries
+	translator = str.maketrans('', '', string.punctuation)
+
 	while True:
 		if not playback_queue.empty():
 
 			# Get audio track and transcription from playback queue
 			track_id, segments, audio = playback_queue.get()
 
+			# Array of times to block out of the playback in the form of (start time, end time)
+			blocked_times = []
+
 			# Display transcription details for audio track
 			for segment in segments:
-				print(f"ID: {segment['id']}\nStart: {segment['start']}, End: {segment['end']}\nText: {segment['text']}\nNoSpeechProb: {segment['no_speech_prob']}\n")
-				formatted_words = [f"\t{segment['words'][i]['word']}: Start: {segment['words'][i]['start']}, End: {segment['words'][i]['end']}" for i in range(len(segment["words"]))]
-				for word in formatted_words:
-					print(word)
+				# Print nicely formatted transcription information
+				# print(f"ID: {segment['id']}\nStart: {segment['start']}, End: {segment['end']}\nText: {segment['text']}\nNoSpeechProb: {segment['no_speech_prob']}\n")
+				# formatted_words = [f"\t{segment['words'][i]['word']}: Start: {segment['words'][i]['start']}, End: {segment['words'][i]['end']}" for i in range(len(segment["words"]))]
 
-			# Scan transcription for banned words
+				# Scan transcription for banned words
+				for word in segment['words']:
+					# Clean word up so that punctuation, spaces, or upper case letters are not needed in lookups
+					reformatted_word = word['word'].translate(translator).lower().strip()
+					if (reformatted_word in banned_words):
+
+						# Only block times above probability threshhold 
+						if word['probability'] > banning_probability:
+							blocked_times.append((word['start'], word['end']))
+							print(f'Blocking {word["word"]} from {word["start"]} to {word["end"]}')
+						else:
+							print(f'Found {word["word"]} from {word["start"]} to {word["end"]} but probability is too low')
 
 			# Playback clean audio segments
+			print('Removing times: ', blocked_times)
 
 		else:
 			time.sleep(0.1) # sleep for 100ms if no audio found
