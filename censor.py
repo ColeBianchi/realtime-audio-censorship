@@ -64,7 +64,7 @@ def process_audio():
 			track_id, audio = recording_queue.get()
 
 			# Transcribe audio track
-			segments = t.run_model_on_pcm(audio, rate, recording_time)
+			segments = t.run_model_on_pcm(audio)
 
 			# Add transcription to playback_queue
 			segments_package = (track_id, segments, audio)
