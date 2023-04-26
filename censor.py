@@ -62,7 +62,7 @@ def record_audio():
 		assert len(indata) == frames
 		# Use special slice to make sure we're pushing a COPY of the indata
 		# values to our queue.
-		mic_callback_queue.put(indata[:])
+		mic_callback_queue.put(indata.copy())
 
 	# Next, we actually need to define the stream that we're going to "connect"
 	# or point at the default input device. Starting a stream basically means
@@ -96,8 +96,8 @@ def record_audio():
 			block = block.squeeze() # Makes audio format match that of everything else internally.
 			block_package = (block_count, block)
 			recording_queue.put(block_package)
-			block_count += 1
 			print(f"Placed audio segment {block_count} of length {len(block_package[-1])} in recording queue.")
+			block_count += 1
 
 		# https://python-sounddevice.readthedocs.io/en/0.4.6/examples.html#recording-with-arbitrary-duration
 		# The above example mimics this most closely--we're we want to wake up
@@ -232,18 +232,18 @@ def playback_audio():
 	# the non-shared output_callback_queue.
 	try:
 		# Preload output_callback_queue.
+		print("preloading output_callback_queue")
 		track_id, censored_audio = playback_queue.get()
-		print(f"Pick up block {track_id} from playback queue.")
 		split_audio = np.split(censored_audio, BLOCKSIZE/10, axis=0)
 		for small_block in split_audio:
 			small_block = np.expand_dims(small_block, axis=1) # Output wants array in form (#samples, 1) rather than squeezed (#sampes,) form.
 			output_callback_queue.put(small_block)
+			print("pushing smaller block to output_callback_queue")
 		print(f"Playing censored track {track_id}.")
 
 		with output_stream:
 			while True:
 				track_id, censored_audio = playback_queue.get()
-				print(f"Pick up block {track_id} from playback queue.")
 				split_audio = np.split(censored_audio, BLOCKSIZE/10, axis=0)
 				for small_block in split_audio:
 					small_block = np.expand_dims(small_block, axis=1) # Output wants array in form (#samples, 1) rather than squeezed (#sampes,) form.
