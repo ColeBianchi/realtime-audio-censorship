@@ -93,6 +93,7 @@ def record_audio():
 		block_count = 0
 		while True:
 			block = mic_callback_queue.get()
+			block = block.squeeze() # Makes audio format match that of everything else internally.
 			block_package = (block_count, block)
 			recording_queue.put(block_package)
 			block_count += 1
@@ -128,52 +129,52 @@ def process_audio():
 	translator = str.maketrans('', '', string.punctuation)
 
 	while True:
-		# Check if there is any audio in the recording queue. If so, read it,
-		# transcribe it, and process it.
-		if not recording_queue.empty():
+		# # Check if there is any audio in the recording queue. If so, read it,
+		# # transcribe it, and process it.
+		# if not recording_queue.empty():
 
-			# Get audio track from shared recording queue.
-			# Blocks by default until there is something to get from the queue.
-			track_id, audio = recording_queue.get()
-			print(f"Transcriber picked up audio track {track_id} -- transcribing now!")
+		# Get audio track from shared recording queue.
+		# Blocks by default until there is something to get from the queue.
+		track_id, audio = recording_queue.get()
+		print(f"Transcriber picked up audio track {track_id} -- transcribing now!")
 
-			# Transcribe audio track
-			transcription_start = time.time()
-			segments = transcriber.run_model_on_pcm(audio)
-			transcription_end = time.time()
-			print(f"Successfully transcribed audio segment {track_id} in {transcription_end-transcription_start}s.")
-			
-			print(f"Beginning censoring words in audio segment {track_id} now.")
-			censoring_start = time.time()
-			# Parse the start/end times of all banned word instances found in the
-			# transcript.
-			banned_word_segment_times = []
-			for segment in segments:
-				for word_dict in segment["words"]:
-					word = word_dict["word"].translate(translator).lower().strip()
-					if word in banned_words:
-						if word_dict['probability'] > BANNING_PROBABILITY:
-							banned_word_segment_times.append((word_dict['start'], word_dict['end']))
-							print(f"\tFound banned word \"{word}\" in audio at {word_dict['start']}-->{word_dict['end']}!")
-						else:
-							print(f"\tFound banned word \"{word}\" in audio at {word_dict['start']}-->{word_dict['end']}, but ignoring as confidence below threshold ({word_dict['probability']} < {BANNING_PROBABILITY}).")
+		# Transcribe audio track
+		transcription_start = time.time()
+		segments = transcriber.run_model_on_pcm(audio)
+		transcription_end = time.time()
+		print(f"Successfully transcribed audio segment {track_id} in {transcription_end-transcription_start}s.")
+		
+		print(f"Beginning censoring words in audio segment {track_id} now.")
+		censoring_start = time.time()
+		# Parse the start/end times of all banned word instances found in the
+		# transcript.
+		banned_word_segment_times = []
+		for segment in segments:
+			for word_dict in segment["words"]:
+				word = word_dict["word"].translate(translator).lower().strip()
+				if word in banned_words:
+					if word_dict['probability'] > BANNING_PROBABILITY:
+						banned_word_segment_times.append((word_dict['start'], word_dict['end']))
+						print(f"\tFound banned word \"{word}\" in audio at {word_dict['start']}-->{word_dict['end']}!")
+					else:
+						print(f"\tFound banned word \"{word}\" in audio at {word_dict['start']}-->{word_dict['end']}, but ignoring as confidence below threshold ({word_dict['probability']} < {BANNING_PROBABILITY}).")
 
-			# "Bleep out" banned portions of audio using speeechremover.
-			censored_audio = bleep_audio_segments(audio_ndarray=audio, audio_samplerate=SAMPLE_RATE, segment_times=banned_word_segment_times)
-			censoring_end = time.time()
-			print(f"Completed censoring of {len(banned_word_segment_times)} banned words in audio segment {track_id} in {censoring_end-censoring_start}s.")
+		# "Bleep out" banned portions of audio using speeechremover.
+		censored_audio = bleep_audio_segments(audio_ndarray=audio, audio_samplerate=SAMPLE_RATE, segment_times=banned_word_segment_times)
+		censoring_end = time.time()
+		print(f"Completed censoring of {len(banned_word_segment_times)} banned words in audio segment {track_id} in {censoring_end-censoring_start}s.")
 
-			# Add censored audio to the playback/output queue.
-			output_package = (track_id, censored_audio)
-			playback_queue.put(output_package)
-			print(f"Placed censored audio segment {track_id} into playback queue.")
+		# Add censored audio to the playback/output queue.
+		output_package = (track_id, censored_audio)
+		playback_queue.put(output_package)
+		print(f"Placed censored audio segment {track_id} into playback queue.")
 
-		else:
-			print(f"[TRANSCRIBER] No audio found in recording queue.")
-			time.sleep(0.1) # sleep for 100ms if no audio found
-			# This may not be necessary, as, if there's nothing in the queue, the
-			# thread may just end up waiting on a condition variable internally
-			# provided by the threadsafe python queue.
+		# else:
+		# 	print(f"[TRANSCRIBER] No audio found in recording queue.")
+		# 	time.sleep(0.1) # sleep for 100ms if no audio found
+		# 	# This may not be necessary, as, if there's nothing in the queue, the
+		# 	# thread may just end up waiting on a condition variable internally
+		# 	# provided by the threadsafe python queue.
 
 def playback_audio():
 	'''
@@ -224,15 +225,27 @@ def playback_audio():
 
 	# Then, define the output stream that will actually take care of playing the
 	# audio.
-	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback, blocksize=BLOCKSIZE)
+	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback, blocksize=SAMPLE_RATE*0.5)
+	# To resolve the issue where it overwrites a massive block of frames when it
+	# becomes slightly out of sync, we should be READING (outputting) frame by frame.
+	# Therefore, what if I set the blocksize for the output to the default optimal
+	# size, and split up the incoming (larger) blocks into chunks of this size. Then
+	# the output_callback and properly use the output_callback_queue and get only as
+	# many smaller frames as it needs at a time!
 
 	# Open up the stream and infinitely push values from the shared playback queue to
 	# the non-shared output_callback_queue.
-	with output_stream:
-		while True:
-			track_id, censored_audio = playback_queue.get()
-			print(f"Playing censored track {track_id}.")
-			output_callback_queue.put(censored_audio)
+	try:
+		with output_stream:
+			while True:
+				track_id, censored_audio = playback_queue.get()
+				print(f"Pick up block {track_id} from playback queue.")
+				for small_block in np.split(censored_audio, BLOCKSIZE/SAMPLE_RATE*0.5, axis=0):
+					small_block = np.expand_dims(small_block, axis=1) # Output wants array in form (#samples, 1) rather than squeezed (#sampes,) form.
+					output_callback_queue.put(small_block)
+				print(f"Playing censored track {track_id}.")
+	except Exception as ex:
+		print(ex)
 	
 if __name__ == "__main__":
 

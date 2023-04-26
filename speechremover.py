@@ -98,7 +98,12 @@ def replace_audio_segment(audio_ndarray: np.ndarray, audio_samplerate: int, star
     start_index = _timestamp_to_index(audio_samplerate, start_timestamp)
     end_index = _timestamp_to_index(audio_samplerate, end_timestamp)
     replace_indices = np.arange(start=start_index, stop=end_index, step=1)
-    audio_ndarray[replace_indices] = replacement_audio
+    try:
+        audio_ndarray[replace_indices] = replacement_audio
+    except Exception as e:
+        print(f"Audio shape: {audio_ndarray.shape} vs sinewave shape: {replacement_audio.shape}")
+        print(f"Replacement indices size? Maybe those were too big? {replace_indices.shape}")
+        print(e)
 
     return audio_ndarray
 
