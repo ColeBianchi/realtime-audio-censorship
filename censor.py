@@ -182,23 +182,55 @@ def playback_audio():
 		None
 	'''
 	
-	while True:
-		if not playback_queue.empty():
+	# For now, to avoid dealing with the output_callback_queue being empty for a
+	# while, maybe I'll just put a sleep here. In fact, if this works--that actually
+	# kinda makes sense. Why? Because, if we gaurantee to the user that it takes our
+	# system end-to-end 1 minute to process their audio, then they'd expect to have
+	# it start coming out 60s later. Therefore, if we just wait that long to start
+	# the output stream, that's probably how it should be anyways! Extra 2 seconds
+	# for setup???
+	time.sleep(RECORDING_INTERVAL*2 - 2)
+	
+	# Just like in record_audio, I think the best route here is to follow the same
+	# kind of scheme: Create a sounddevice OutputStream and a callback that will take
+	# our desired output data and write it to the address provided as a callback
+	# argument.
 
-			# Get audio track and transcription from playback queue
+	# Here I create a queue that we will update externally with the playback queue,
+	# but that will have results immediately for the callback to pull from (so no
+	# risk of waiting on synchronization).
+	output_callback_queue = queue.Queue()
+	
+	# Here's the callback as specified in the sounddevice docs. All we do here is
+	# write the most recent value from our internal output_callback_queue to the
+	# array at the outdata address.
+	def output_callback(outdata: np.ndarray, frames: int, time, status) -> None:
+		try:
+			output_frames = output_callback_queue.get_nowait()
+		except queue.Empty as e:
+			print(f"output_callback_queue is empty (no censored audio to playback)")
+			# Raising callback abort will terminate the stream before letting its
+			# buffers "drain."
+
+			# Could also consider just pushing out zeros here, rather than aborting.
+			# Maybe experiment with this--no data for us doesn't mean we're done,
+			# necessarily (it might have meant that for this example though).
+			raise sd.CallbackAbort from e
+		
+		assert(len(output_frames) == frames)
+		outdata[:] = output_frames
+
+	# Then, define the output stream that will actually take care of playing the
+	# audio.
+	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback)
+
+	# Open up the stream and infinitely push values from the shared playback queue to
+	# the non-shared output_callback_queue.
+	with output_stream:
+		while True:
 			track_id, censored_audio = playback_queue.get()
-
-			# Take audio and play it with sounddevice.
-			print(f"Playing censored track {track_id}. Has length: {len(censored_audio)}")
-			play_start = time.time()
-			sd.play(censored_audio, samplerate=SAMPLE_RATE)
-			sd.wait()
-			play_end = time.time()
-			print(f"Played audio for {play_end - play_start}s.")
-
-		else:
-			print("No audio found to play!")
-			time.sleep(0.1) # sleep for 100ms if no audio found
+			print(f"Playing censored track {track_id}.")
+			output_callback_queue.put(censored_audio)
 	
 if __name__ == "__main__":
 
