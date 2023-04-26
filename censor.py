@@ -40,6 +40,10 @@ def record_audio():
 		# Grab frames from recorder. This will be an ndarray of samples from
 		# sounddevice.
 		frames = rec.get_frames()
+		print(f"Shape of recorded frames: {frames.shape}")
+		# Format audio such that it's always one-dimensional.
+		frames = frames.squeeze()
+		print(f"Squeezed frame shape: {frames.shape}")
 
 		# Add audio frames to shared recording queue
 		frames_package = (frame_count, frames)
