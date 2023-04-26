@@ -27,7 +27,6 @@ def record_audio():
 	'''
 	frame_count = 0
 	while True:
-		start = time.time()
 
 		# Record audio and split into N second long frames for processing
 		rec = recorder.AudioRecorder(duration=RECORDING_INTERVAL)
@@ -45,14 +44,12 @@ def record_audio():
 		# Add audio frames to shared recording queue
 		frames_package = (frame_count, frames)
 		recording_queue.put(frames_package)
-
-		frame_count =+ 1
+		print(f"Placed audio segment {frame_count} in recording queue.")
+		frame_count += 1
 
 		# Save frames for debugging review
 		if SAVE_FRAMES:
 			rec.save(f'frame_{frame_count}')
-
-		print(f'Obtained audio segment in {time.time() - start} seconds')
 
 def process_audio():
 	'''
@@ -85,10 +82,16 @@ def process_audio():
 			# Get audio track from shared recording queue.
 			# Blocks by default until there is something to get from the queue.
 			track_id, audio = recording_queue.get()
+			print(f"Transcriber picked up audio track {track_id} -- transcribing now!")
 
 			# Transcribe audio track
+			transcription_start = time.time()
 			segments = transcriber.run_model_on_pcm(audio)
-
+			transcription_end = time.time()
+			print(f"Successfully transcribed audio segment {track_id} in {transcription_end-transcription_start}s.")
+			
+			print(f"Beginning censoring words in audio segment {track_id} now.")
+			censoring_start = time.time()
 			# Parse the start/end times of all banned word instances found in the
 			# transcript.
 			banned_word_segment_times = []
@@ -104,12 +107,16 @@ def process_audio():
 
 			# "Bleep out" banned portions of audio using speeechremover.
 			censored_audio = bleep_audio_segments(audio_ndarray=audio, audio_samplerate=SAMPLE_RATE, segment_times=banned_word_segment_times)
+			censoring_end = time.time()
+			print(f"Completed censoring of {len(banned_word_segment_times)} banned words in audio segment {track_id} in {censoring_end-censoring_start}s.")
 
 			# Add censored audio to the playback/output queue.
 			output_package = (track_id, censored_audio)
 			playback_queue.put(output_package)
+			print(f"Placed censored audio segment {track_id} into playback queue.")
 
 		else:
+			print(f"No audio found in recording queue.")
 			time.sleep(0.1) # sleep for 100ms if no audio found
 			# This may not be necessary, as, if there's nothing in the queue, the
 			# thread may just end up waiting on a condition variable internally

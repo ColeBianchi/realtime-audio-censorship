@@ -30,12 +30,10 @@ class Transcriber():
 		Returns:
 			Array of segments of labeled words
 		'''
-		# audio = self._format_pcm(pcm)
-		audio = pcm
+		audio = self._format_pcm(pcm)
 
 		transcribe_start = time.time()
 		results = self.model.transcribe(audio, word_timestamps=True)
 		transcribe_end = time.time()
-		print(f"It took {transcribe_end - transcribe_start} to transcribe the size {len(audio)} audio.")
 
 		return results["segments"]
