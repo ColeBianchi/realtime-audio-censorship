@@ -169,13 +169,6 @@ def process_audio():
 		playback_queue.put(output_package)
 		print(f"Placed censored audio segment {track_id} into playback queue.")
 
-		# else:
-		# 	print(f"[TRANSCRIBER] No audio found in recording queue.")
-		# 	time.sleep(0.1) # sleep for 100ms if no audio found
-		# 	# This may not be necessary, as, if there's nothing in the queue, the
-		# 	# thread may just end up waiting on a condition variable internally
-		# 	# provided by the threadsafe python queue.
-
 def playback_audio():
 	'''
 	Scans to see if audio track violates word list and if not plays the track back over the device's speakers
@@ -225,7 +218,9 @@ def playback_audio():
 
 	# Then, define the output stream that will actually take care of playing the
 	# audio.
-	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback, blocksize=SAMPLE_RATE*0.5)
+	# Note that the SAMPLE_RATE*0.5 is an arbitrary small number choice--smaller ==
+	# more granular, but I don't know how small it's supposed to be.
+	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback, blocksize=10)
 	# To resolve the issue where it overwrites a massive block of frames when it
 	# becomes slightly out of sync, we should be READING (outputting) frame by frame.
 	# Therefore, what if I set the blocksize for the output to the default optimal
@@ -236,11 +231,21 @@ def playback_audio():
 	# Open up the stream and infinitely push values from the shared playback queue to
 	# the non-shared output_callback_queue.
 	try:
+		# Preload output_callback_queue.
+		track_id, censored_audio = playback_queue.get()
+		print(f"Pick up block {track_id} from playback queue.")
+		split_audio = np.split(censored_audio, BLOCKSIZE/10, axis=0)
+		for small_block in split_audio:
+			small_block = np.expand_dims(small_block, axis=1) # Output wants array in form (#samples, 1) rather than squeezed (#sampes,) form.
+			output_callback_queue.put(small_block)
+		print(f"Playing censored track {track_id}.")
+
 		with output_stream:
 			while True:
 				track_id, censored_audio = playback_queue.get()
 				print(f"Pick up block {track_id} from playback queue.")
-				for small_block in np.split(censored_audio, BLOCKSIZE/SAMPLE_RATE*0.5, axis=0):
+				split_audio = np.split(censored_audio, BLOCKSIZE/10, axis=0)
+				for small_block in split_audio:
 					small_block = np.expand_dims(small_block, axis=1) # Output wants array in form (#samples, 1) rather than squeezed (#sampes,) form.
 					output_callback_queue.put(small_block)
 				print(f"Playing censored track {track_id}.")
