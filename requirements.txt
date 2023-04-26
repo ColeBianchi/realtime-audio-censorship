@@ -2,3 +2,4 @@ numpy
 sounddevice
 scipy
 openai-whisper
+wavio
