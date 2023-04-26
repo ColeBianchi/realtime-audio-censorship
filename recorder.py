@@ -1,3 +1,4 @@
+import time
 import sounddevice as sd
 from scipy.io.wavfile import write
 import threading
@@ -7,7 +8,7 @@ class AudioRecorder(threading.Thread):
 	'''
 	Asynchronous audio recording class, uses default device microphone
 	'''
-	def __init__(self, duration):
+	def __init__(self, duration, sample_rate):
 		'''
 		Constructor for audio recorder
 		Arguments:
@@ -16,7 +17,7 @@ class AudioRecorder(threading.Thread):
 		super(AudioRecorder, self).__init__()
 		self.duration = duration
 		self.frames = None
-		self.rate = 16000
+		self.rate = sample_rate
 
 	def set_rate(self, hz):
 		'''
@@ -38,8 +39,11 @@ class AudioRecorder(threading.Thread):
 		'''
 		channels = 1
 		sample_rate = self.rate
+		record_start = time.time()
 		self.frames = sd.rec(int(self.duration * sample_rate), samplerate=sample_rate, channels=channels)
 		sd.wait()
+		record_end = time.time()
+		print(f"Recorded audio for {record_end-record_start}s.")
 
 	def get_frames(self):
 		'''

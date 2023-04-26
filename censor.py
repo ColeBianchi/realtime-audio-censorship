@@ -12,7 +12,7 @@ from speechremover import bleep_audio_segments
 recording_queue = queue.Queue()
 playback_queue = queue.Queue()
 
-RECORDING_INTERVAL = 20
+RECORDING_INTERVAL = 30
 SAMPLE_RATE = 16000
 SAVE_FRAMES = False
 BANNING_PROBABILITY = 0.2
@@ -29,7 +29,7 @@ def record_audio():
 	while True:
 
 		# Record audio and split into N second long frames for processing
-		rec = recorder.AudioRecorder(duration=RECORDING_INTERVAL)
+		rec = recorder.AudioRecorder(duration=RECORDING_INTERVAL, sample_rate=SAMPLE_RATE)
 		rec.set_rate(SAMPLE_RATE)
 		recording_thread = threading.Thread(target=rec.run)
 		recording_thread.daemon = True
@@ -42,6 +42,7 @@ def record_audio():
 		frames = rec.get_frames()
 		# Format audio such that it's always one-dimensional.
 		frames = frames.squeeze()
+		print(f"Number of samples in recorded track {frame_count}: {len(frames)}")
 
 		# Add audio frames to shared recording queue
 		frames_package = (frame_count, frames)
@@ -140,8 +141,12 @@ def playback_audio():
 			track_id, censored_audio = playback_queue.get()
 
 			# Take audio and play it with sounddevice.
-			print(f"Playing censored track {track_id}.")
+			print(f"Playing censored track {track_id}. Has length: {len(censored_audio)}")
+			play_start = time.time()
 			sd.play(censored_audio, samplerate=SAMPLE_RATE)
+			sd.wait()
+			play_end = time.time()
+			print(f"Played audio for {play_end - play_start}s.")
 
 		else:
 			print("No audio found to play!")
