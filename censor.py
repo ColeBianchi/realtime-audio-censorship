@@ -29,7 +29,7 @@ def record_audio():
 	while True:
 
 		# Record audio and split into N second long frames for processing
-		rec = recorder.AudioRecorder(duration=RECORDING_INTERVAL, sample_rate=SAMPLE_RATE)
+		rec = recorder.AudioRecorder(duration=RECORDING_INTERVAL, sample_rate=SAMPLE_RATE, recording_queue)
 		rec.set_rate(SAMPLE_RATE)
 		recording_thread = threading.Thread(target=rec.run)
 		recording_thread.daemon = True
