@@ -119,7 +119,7 @@ def process_audio():
 	transcriber = Transcriber()
 
 	# Load banned words list to scan later.
-	banned_words = ["andre", "test", "nate", "phone"]
+	banned_words = []
 	with open('banned_words.txt', 'r') as f:
 		for line in f:
 			banned_words.append(line.strip())
