@@ -18,6 +18,7 @@ SAMPLE_RATE = 16000
 CHANNELS = 1
 SAVE_FRAMES = False
 BANNING_PROBABILITY = 0.2
+BLOCKSIZE = RECORDING_INTERVAL*SAMPLE_RATE
 
 def record_audio():
 	'''
@@ -75,7 +76,7 @@ def record_audio():
 	# and hand it off to us (normal streams can connect to multiple input and/or
 	# output devices--we don't need/want that for our input!).
 
-	mic_stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=mic_callback)
+	mic_stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=mic_callback, blocksize=BLOCKSIZE)
 
 	# How do I start the stream? Well, the __enter__ functionality
 	# (executed when we use it with "with") calls "self.start" -- and that's what
@@ -89,12 +90,13 @@ def record_audio():
 		# Once the stream is running, I basically just want to continuously take
 		# data out of that "mic_callback_queue" and put it into our shared
 		# recording_queue as soon as new data is available.
-		frame_count = 0
+		block_count = 0
 		while True:
-			frame_package = (frame_count, mic_callback_queue.get())
-			recording_queue.put(frame_package)
-			frame_count += 1
-			print(f"Placed audio segment {frame_count} of length {len(frame_package[-1])} in recording queue.")
+			block = mic_callback_queue.get()
+			block_package = (block_count, block)
+			recording_queue.put(block_package)
+			block_count += 1
+			print(f"Placed audio segment {block_count} of length {len(block_package[-1])} in recording queue.")
 
 		# https://python-sounddevice.readthedocs.io/en/0.4.6/examples.html#recording-with-arbitrary-duration
 		# The above example mimics this most closely--we're we want to wake up
@@ -167,7 +169,7 @@ def process_audio():
 			print(f"Placed censored audio segment {track_id} into playback queue.")
 
 		else:
-			print(f"No audio found in recording queue.")
+			print(f"[TRANSCRIBER] No audio found in recording queue.")
 			time.sleep(0.1) # sleep for 100ms if no audio found
 			# This may not be necessary, as, if there's nothing in the queue, the
 			# thread may just end up waiting on a condition variable internally
@@ -222,7 +224,7 @@ def playback_audio():
 
 	# Then, define the output stream that will actually take care of playing the
 	# audio.
-	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback)
+	output_stream = sd.OutputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=output_callback, blocksize=BLOCKSIZE)
 
 	# Open up the stream and infinitely push values from the shared playback queue to
 	# the non-shared output_callback_queue.
