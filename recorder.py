@@ -41,7 +41,6 @@ class AudioRecorder(threading.Thread):
 		Returns:
 			None
 		'''
-		record_start = time.time()
 		# self.frames = sd.rec(int(self.duration * sample_rate),
 		# samplerate=sample_rate, channels=channels)
 

@@ -5,6 +5,7 @@ import recorder
 import os
 import string
 import sounddevice as sd
+import numpy as np
 
 from whisper_transcribe import Transcriber
 from speechremover import bleep_audio_segments
@@ -14,45 +15,92 @@ playback_queue = queue.Queue()
 
 RECORDING_INTERVAL = 30
 SAMPLE_RATE = 16000
+CHANNELS = 1
 SAVE_FRAMES = False
 BANNING_PROBABILITY = 0.2
 
 def record_audio():
 	'''
-	Starts a new thread to record audio live and output it as PCM data frames
-	Arugments:
-		None
-	Returns:
-		Live output to recorded audio queue in the form of PCM data frames
+	Creates a sounddevice InputStream and records audio to a queue. This function
+	then takes that and pushes it to the shared recording_queue.
 	'''
-	frame_count = 0
-	while True:
 
-		# Record audio and split into N second long frames for processing
-		rec = recorder.AudioRecorder(duration=RECORDING_INTERVAL, sample_rate=SAMPLE_RATE, recording_queue)
-		rec.set_rate(SAMPLE_RATE)
-		recording_thread = threading.Thread(target=rec.run)
-		recording_thread.daemon = True
-		recording_thread.start()
+	# self.frames = sd.rec(int(self.duration * sample_rate),
+	# samplerate=sample_rate, channels=channels)
 
-		time.sleep(RECORDING_INTERVAL)
+	# Okay, to avoid the stopping issues, I'm going to try and use the raw
+	# InputStream provided by sounddevice for recording.
+	# https://python-sounddevice.readthedocs.io/en/0.4.6/api/streams.html#sounddevice.InputStream
+	# A more practical example (which I based this on) is
+	# https://python-sounddevice.readthedocs.io/en/0.4.6/examples.html#plot-microphone-signal-s-in-real-time 
 
-		# Grab frames from recorder. This will be an ndarray of samples from
-		# sounddevice.
-		frames = rec.get_frames()
-		# Format audio such that it's always one-dimensional.
-		frames = frames.squeeze()
-		print(f"Number of samples in recorded track {frame_count}: {len(frames)}")
+	# First, define the callback that PortAudio will call while the stream is
+	# running. PortAudio will call this and provide as many frames as we specify,
+	# and it's the job of this callback to take those frames and put them
+	# somewhere.
+	# Callback signature as provided in docs.
 
-		# Add audio frames to shared recording queue
-		frames_package = (frame_count, frames)
-		recording_queue.put(frames_package)
-		print(f"Placed audio segment {frame_count} in recording queue.")
-		frame_count += 1
+	# "The PortAudio stream callback runs at very high or real-time priority. It
+	# is required to consistently meet its time deadlines. Do not allocate
+	# memory, access the file system, call library functions or call other
+	# functions from the stream callback that may block or take an unpredictable
+	# amount of time to complete."
 
-		# Save frames for debugging review
-		if SAVE_FRAMES:
-			rec.save(f'frame_{frame_count}')
+	# THE ABOVE is important, because it means: we want to push the data that
+	# PortAudio passes to this callback to a data structure that we don't have to
+	# wait to use--like a queue shared by multiple threads. Obtaining the lock
+	# could lead to unpredictable wait times--which screws up PortAudio.
+
+	# Instead, we create a separate queue for "callback use only," which we'll
+	# then grab items from and push to our shared array. So sure--it's another
+	# intermediary data structure, but necessary.
+
+	mic_callback_queue = queue.Queue()
+
+	def mic_callback(indata: np.ndarray, frames: int, time, status) -> None:
+		assert len(indata) == frames
+		# Use special slice to make sure we're pushing a COPY of the indata
+		# values to our queue.
+		mic_callback_queue.put(indata[:])
+
+	# Next, we actually need to define the stream that we're going to "connect"
+	# or point at the default input device. Starting a stream basically means
+	# firing up a thread where PortAudio (a C/C++ Audio I/O library) runs and
+	# takes data from inputs / writes data to outputs. The stream we define is a
+	# convenient framework for telling PortAudio what to do!
+
+	# In this case, we'll define a special case of the normal Stream called
+	# InputStream. This is just a normal stream, but we can only read from it, as
+	# it is just telling PortAudio to grab the data provided by our microphone
+	# and hand it off to us (normal streams can connect to multiple input and/or
+	# output devices--we don't need/want that for our input!).
+
+	mic_stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=mic_callback)
+
+	# How do I start the stream? Well, the __enter__ functionality
+	# (executed when we use it with "with") calls "self.start" -- and that's what
+	# they do in all th examples--so I'll follow that.
+	with mic_stream:
+
+		print('#' * 80)
+		print('press Ctrl+C to stop the recording')
+		print('#' * 80)
+
+		# Once the stream is running, I basically just want to continuously take
+		# data out of that "mic_callback_queue" and put it into our shared
+		# recording_queue as soon as new data is available.
+		frame_count = 0
+		while True:
+			frame_package = (frame_count, mic_callback_queue.get())
+			recording_queue.put(frame_package)
+			frame_count += 1
+			print(f"Placed audio segment {frame_count} of length {len(frame_package[-1])} in recording queue.")
+
+		# https://python-sounddevice.readthedocs.io/en/0.4.6/examples.html#recording-with-arbitrary-duration
+		# The above example mimics this most closely--we're we want to wake up
+		# this thread to wait on the queue's condition until woken up by the
+		# PortAudio (Stream) thread that is going to put more data in the
+		# mic_callback_queue via the callback function.
 
 def process_audio():
 	'''
@@ -152,21 +200,27 @@ def playback_audio():
 			print("No audio found to play!")
 			time.sleep(0.1) # sleep for 100ms if no audio found
 	
+if __name__ == "__main__":
 
+	try:
+		
+		#Start threads
+		processing_thread = threading.Thread(target=process_audio)
+		processing_thread.daemon = True
+		processing_thread.start()
 
-#Start threads
-processing_thread = threading.Thread(target=process_audio)
-processing_thread.daemon = True
-processing_thread.start()
+		playback_thread = threading.Thread(target=playback_audio)
+		playback_thread.daemon = True
+		playback_thread.start()
 
-playback_thread = threading.Thread(target=playback_audio)
-playback_thread.daemon = True
-playback_thread.start()
+		#Start recording thread
+		record_audio()
 
-#Start recording thread
-record_audio()
+		#Wait for threads to exit
+		recording_queue.join()
+		playback_queue.join()
 
-
-#Wait for threads to exit
-recording_queue.join()
-playback_queue.join()
+	except KeyboardInterrupt:
+		print('\nRecording finished: ')
+	except Exception as e:
+		print(e)
