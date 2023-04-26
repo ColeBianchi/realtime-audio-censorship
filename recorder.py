@@ -101,19 +101,17 @@ class AudioRecorder(threading.Thread):
 			# Once the stream is running, I basically just want to continuously take
 			# data out of that "mic_callback_queue" and put it into our shared
 			# recording_queue as soon as new data is available.
+			frame_count = 0
 			while True:
-				self.recording_queue.put(self.mic_callback_queue.get())
+				frame_package = (frame_count, self.mic_callback_queue.get())
+				self.recording_queue.put(frame_package)
+				frame_count += 1
 
 			# https://python-sounddevice.readthedocs.io/en/0.4.6/examples.html#recording-with-arbitrary-duration
 			# The above example mimics this most closely--we're we want to wake up
 			# this thread to wait on the queue's condition until woken up by the
 			# PortAudio (Stream) thread that is going to put more data in the
 			# mic_callback_queue via the callback function.
-
-
-		# sd.wait()
-		record_end = time.time()
-		print(f"Recorded audio for {record_end-record_start}s.")
 
 	def get_frames(self):
 		'''
